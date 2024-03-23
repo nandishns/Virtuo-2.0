@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import math
 import time
+import socket
 
 # Initialize MediaPipe Pose model
 mp_pose = mp.solutions.pose
@@ -68,11 +69,21 @@ def detect_single_hand_raised(landmarks):
 
     # Check if only one hand is raised
     if abs(right_angle - 90) < 15 and abs(left_angle - 90) >= 15:
-        return 'right'
+        print("Go right 👉")
+        return 'Right'
     elif abs(left_angle - 90) < 15 and abs(right_angle - 90) >= 15:
-        return 'left'
+        print("Go left 👈")
+        return 'Left'
     else:
         return None
+
+UDP_IP = "127.0.0.1"
+UDP_PORT = 5005
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+def send_pose(pose):
+    message = pose.encode('utf-8')
+    sock.sendto(message, (UDP_IP, UDP_PORT))
 
 def main():
     # Initialize MediaPipe Pose model
@@ -108,22 +119,29 @@ def main():
 
             if start_time is None or time.time() - start_time > 2:
                 if game and detect_jump(prev_head_y, curr_head_y) and not jump_detected :
-                    print("Jump detected!")
+                    print("Jumped 🤺")
+                    send_pose("Jump")
                     start_time = time.time()
                     continue
                 hands_raised = detect_hands_raised(landmarks)
                 if hands_raised :
                     print("Hands raised to the side!")
+                    # send_pose("Pause/Play")
                     start_time = time.time()
                     if game:
                         game = False
+                        print("Paused ▶️")
+                        send_pose("Pause")
                     else:
                         game = True
+                        print("Play ⏸️")
+                        send_pose("Play")
                     print("game :",game) 
                     continue
                 hand_raised = detect_single_hand_raised(landmarks)
                 if game and hand_raised:
                     print(f"{hand_raised.capitalize()} hand raised!")
+                    send_pose(f"{hand_raised}")
                     start_time = time.time() 
             
             # Update previous head y-coordinate
